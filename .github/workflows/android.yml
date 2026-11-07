@@ -1,0 +1,6 @@
+# 1. Initialize Git, commit all project files, and automatically create + push the repository on GitHub (via GitHub CLI)
+git init
+git branch -M main
+git add .
+git commit -m "Initial commit: Atmosphere AI Android Weather Platform"
+gh repo create Atmosphere-AI --public --source=. --remote=origin --push
