@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">Atmosphere AI</string>
+    <string name="widget_title">Atmosphere AI Weather</string>
+    <string name="widget_description">Real-time temperature, conditions, AQI, and Iraq dust telemetry on your home screen.</string>
+    <string name="nav_dashboard">Dashboard</string>
+    <string name="nav_forecasts">Forecasts</string>
+    <string name="nav_radar">Radar</string>
+    <string name="nav_air_analytics">Env &amp; Charts</string>
+    <string name="nav_ai">AI Assistant</string>
+    <string name="nav_cities_alerts">Cities &amp; Alerts</string>
+    <string name="nav_settings">Settings</string>
+</resources>
