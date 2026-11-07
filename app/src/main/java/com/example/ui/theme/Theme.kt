@@ -63,7 +63,7 @@ private val AtmosphereLightColorScheme = lightColorScheme(
 @Composable
 fun AtmosphereAITheme(
     themeMode: AppThemeMode = AppThemeMode.DARK,
-    language: AppLanguage = AppLanguage.ENGLISH,
+    language: AppLanguage = AppLanguage.ARABIC,
     content: @Composable () -> Unit
 ) {
     val isDark = when (themeMode) {
@@ -73,7 +73,8 @@ fun AtmosphereAITheme(
     }
 
     val colorScheme = if (isDark) AtmosphereDarkColorScheme else AtmosphereLightColorScheme
-    val layoutDirection = if (language == AppLanguage.ARABIC) {
+    val isArabic = language == AppLanguage.ARABIC
+    val layoutDirection = if (isArabic) {
         LayoutDirection.Rtl
     } else {
         LayoutDirection.Ltr
@@ -82,7 +83,7 @@ fun AtmosphereAITheme(
     CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = Typography,
+            typography = buildAppTypography(isArabic = isArabic),
             content = content
         )
     }

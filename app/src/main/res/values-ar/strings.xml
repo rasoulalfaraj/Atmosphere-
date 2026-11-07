@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Atmosphere AI</string>
+    <string name="widget_title">طقس Atmosphere AI</string>
+    <string name="widget_description">درجة الحرارة المباشرة، حالة الطقس، جودة الهواء، ورصد الغبار في العراق على شاشتك الرئيسية.</string>
+    <string name="nav_dashboard">الرئيسية</string>
+    <string name="nav_forecasts">التوقعات</string>
+    <string name="nav_radar">الرادار</string>
+    <string name="nav_air_analytics">البيئة</string>
+    <string name="nav_smart_hub">المستشار الذكي</string>
+    <string name="nav_ai">الذكاء الجوي</string>
+    <string name="nav_cities_alerts">المدن والتحذيرات</string>
+    <string name="nav_settings">الإعدادات</string>
+</resources>

@@ -38,7 +38,7 @@ enum class AqiStandard(val labelEn: String, val labelAr: String) {
 }
 
 data class UserPreferences(
-    val language: AppLanguage = AppLanguage.ENGLISH,
+    val language: AppLanguage = AppLanguage.ARABIC,
     val themeMode: AppThemeMode = AppThemeMode.DARK,
     val tempUnit: TempUnit = TempUnit.CELSIUS,
     val windUnit: WindUnit = WindUnit.KMH,
@@ -314,6 +314,66 @@ enum class DataFreshnessSource {
     CLIMATOLOGICAL_FALLBACK
 }
 
+data class SolarEnergyInsight(
+    val panelEfficiencyPercent: Int,
+    val peakSunHours: Double,
+    val dustSoilingLossPercent: Int,
+    val heatDeratingPercent: Int,
+    val estimatedKwhPer5KwSystem: Double,
+    val cleaningAdviceEn: String,
+    val cleaningAdviceAr: String,
+    val inverterNoteEn: String,
+    val inverterNoteAr: String
+)
+
+data class AgricultureInsight(
+    val evapotranspirationMmDay: Double,
+    val irrigationNeedEn: String,
+    val irrigationNeedAr: String,
+    val datePalmStatusEn: String,
+    val datePalmStatusAr: String,
+    val sprayingWindowEn: String,
+    val sprayingWindowAr: String,
+    val soilStressScore: Int // 0..100
+)
+
+data class HealthBiometeorologyInsight(
+    val dailyWaterLiters: Double,
+    val dailyWaterCups: Int,
+    val respiratoryDustRiskEn: String,
+    val respiratoryDustRiskAr: String,
+    val respiratoryRiskLevel: Int, // 1..4
+    val migrainePressureRiskEn: String,
+    val migrainePressureRiskAr: String,
+    val migraineRiskLevel: Int, // 1..4
+    val heatStrokeRiskEn: String,
+    val heatStrokeRiskAr: String,
+    val sinusAndJointNoteEn: String,
+    val sinusAndJointNoteAr: String
+)
+
+data class PrayerWeatherSlot(
+    val nameEn: String,
+    val nameAr: String,
+    val timeHHMM: String,
+    val tempC: Double,
+    val windKmh: Double,
+    val statusEn: String,
+    val statusAr: String
+)
+
+data class HighwayCorridorStatus(
+    val id: String,
+    val nameEn: String,
+    val nameAr: String,
+    val visibilityKm: Double,
+    val windKmh: Double,
+    val dustUgM3: Double,
+    val safetyScore: Int, // 0..100
+    val statusEn: String,
+    val statusAr: String
+)
+
 data class WeatherBundle(
     val city: CityLocation,
     val current: CurrentWeather,
@@ -325,6 +385,11 @@ data class WeatherBundle(
     val comfort: ComfortScoreBreakdown,
     val goldenHour: GoldenHourInfo,
     val astronomy: AstronomyInfo,
+    val solarInsight: SolarEnergyInsight,
+    val agricultureInsight: AgricultureInsight,
+    val healthInsight: HealthBiometeorologyInsight,
+    val prayerSchedule: List<PrayerWeatherSlot>,
+    val highwayCorridors: List<HighwayCorridorStatus>,
     val radarFrames: List<RadarFrame>,
     val radarHost: String = "https://tilecache.rainviewer.com",
     val fetchedAtEpochMillis: Long,

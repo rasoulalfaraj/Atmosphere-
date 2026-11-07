@@ -12,7 +12,7 @@ import org.junit.Test
 class ExampleRobolectricTest {
 
     @Test
-    fun comfortScore_and_goldenHour_and_alerts_workCorrectly() {
+    fun comfortScore_and_goldenHour_and_smartAdvisors_workCorrectly() {
         val baghdad = IraqiCitiesCatalog.findById("iq_baghdad")
         assertEquals("Baghdad", baghdad.nameEn)
         assertEquals("بغداد", baghdad.nameAr)
@@ -86,13 +86,19 @@ class ExampleRobolectricTest {
         assertEquals("05:05", golden.sunriseTime)
         assertEquals("19:10", golden.sunsetTime)
 
-        val alerts = MeteorologyCalculator.evaluateWeatherAlerts(
-            city = baghdad,
-            current = sampleCurrent,
-            hourly = emptyList(),
-            daily = emptyList(),
-            airQuality = sampleAq
-        )
-        assertTrue("Expected dust, heat, and wind alerts", alerts.size >= 3)
+        val solar = MeteorologyCalculator.calculateSolarEnergyInsight(sampleCurrent, sampleAq, emptyList())
+        assertTrue(solar.panelEfficiencyPercent in 20..100)
+
+        val agri = MeteorologyCalculator.calculateAgricultureInsight(sampleCurrent, sampleAq)
+        assertTrue(agri.evapotranspirationMmDay > 0.0)
+
+        val health = MeteorologyCalculator.calculateHealthBiometeorology(sampleCurrent, emptyList(), sampleAq)
+        assertTrue(health.dailyWaterCups >= 8)
+
+        val prayers = MeteorologyCalculator.calculatePrayerWeatherSchedule(sampleCurrent, emptyList())
+        assertEquals(6, prayers.size)
+
+        val highways = MeteorologyCalculator.calculateIraqHighwayCorridors(sampleCurrent, sampleAq)
+        assertEquals(4, highways.size)
     }
 }

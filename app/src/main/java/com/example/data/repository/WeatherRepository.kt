@@ -556,6 +556,28 @@ class WeatherRepository(
             daily = upcomingDaily,
             airQuality = airQualityData
         )
+        val solarInsight = MeteorologyCalculator.calculateSolarEnergyInsight(
+            current = currentWeather,
+            airQuality = airQualityData,
+            daily = upcomingDaily
+        )
+        val agricultureInsight = MeteorologyCalculator.calculateAgricultureInsight(
+            current = currentWeather,
+            airQuality = airQualityData
+        )
+        val healthInsight = MeteorologyCalculator.calculateHealthBiometeorology(
+            current = currentWeather,
+            hourly = hourlyItems,
+            airQuality = airQualityData
+        )
+        val prayerSchedule = MeteorologyCalculator.calculatePrayerWeatherSchedule(
+            current = currentWeather,
+            hourly = hourlyItems
+        )
+        val highwayCorridors = MeteorologyCalculator.calculateIraqHighwayCorridors(
+            current = currentWeather,
+            airQuality = airQualityData
+        )
 
         val radarFrames = buildRadarFrames(radarDto, timestampMillis)
 
@@ -570,6 +592,11 @@ class WeatherRepository(
             comfort = comfort,
             goldenHour = goldenHour,
             astronomy = astronomy,
+            solarInsight = solarInsight,
+            agricultureInsight = agricultureInsight,
+            healthInsight = healthInsight,
+            prayerSchedule = prayerSchedule,
+            highwayCorridors = highwayCorridors,
             radarFrames = radarFrames,
             radarHost = radarDto?.host ?: "https://tilecache.rainviewer.com",
             fetchedAtEpochMillis = timestampMillis,

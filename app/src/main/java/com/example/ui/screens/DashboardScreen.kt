@@ -110,6 +110,7 @@ fun DashboardScreen(
     onOpenAlertsAndCities: () -> Unit,
     onOpenAiAssistant: () -> Unit,
     onOpenAirQuality: () -> Unit,
+    onOpenSmartAdvisors: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val lang = prefs.language
@@ -430,23 +431,130 @@ fun DashboardScreen(
             }
         }
 
-        // 7. Outdoor Comfort Score Card (Explainable AI & Biometeorology)
+        // 7. NEW: Smart Advisors Quick Overview (Solar, Hydration, Prayer Weather, Agriculture, Highways)
+        item {
+            SmartAdvisorsQuickCard(
+                bundle = bundle,
+                prefs = prefs,
+                onOpenSmartAdvisors = onOpenSmartAdvisors
+            )
+        }
+
+        // 8. Outdoor Comfort Score Card (Explainable AI & Biometeorology)
         item {
             OutdoorComfortScoreCard(bundle = bundle, lang = lang)
         }
 
-        // 8. Golden Hour Tracker & Weather Photography Mode
+        // 9. Golden Hour Tracker & Weather Photography Mode
         item {
             GoldenHourPhotographyCard(bundle = bundle, lang = lang)
         }
 
-        // 9. Astronomy Dashboard (Moon Phase, Moonrise/Moonset, Stargazing)
+        // 10. Astronomy Dashboard (Moon Phase, Moonrise/Moonset, Stargazing)
         item {
             AstronomyDashboardCard(bundle = bundle, lang = lang)
         }
 
         item {
             Spacer(modifier = Modifier.height(24.dp))
+        }
+    }
+}
+
+@Composable
+private fun SmartAdvisorsQuickCard(
+    bundle: WeatherBundle,
+    prefs: UserPreferences,
+    onOpenSmartAdvisors: () -> Unit
+) {
+    val lang = prefs.language
+    val solar = bundle.solarInsight
+    val health = bundle.healthInsight
+    val agri = bundle.agricultureInsight
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.85f))
+            .border(1.dp, IonCyan.copy(alpha = 0.45f), RoundedCornerShape(24.dp))
+            .clickable { onOpenSmartAdvisors() }
+            .padding(16.dp)
+            .testTag("smart_advisors_quick_card"),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = tr(
+                        lang,
+                        "Smart Advisors: Solar • Health • Prayer • Agri • Roads",
+                        "المستشار الذكي: الطاقة الشمسية • الصحة • مواقيت الصلاة • الزراعة • الطرق"
+                    ),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurface,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = tr(
+                        lang,
+                        "Tap to open interactive calculators & Iraqi corridor safety",
+                        "اضغط لفتح حاسبة الأمبير الشمسي، شرب الماء، طقس الصلوات، والطرق الخارجية"
+                    ),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Text(
+                text = tr(lang, "Explore →", "افتح ←"),
+                style = MaterialTheme.typography.labelLarge,
+                color = IonCyan,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            MiniStatPill(
+                label = tr(lang, "Solar PV Eff.", "كفاءة الألواح"),
+                value = "${solar.panelEfficiencyPercent}% (${String.format(Locale.US, "%.1f", solar.estimatedKwhPer5KwSystem)} kWh)",
+                color = SolarAmber
+            )
+            MiniStatPill(
+                label = tr(lang, "Water Need", "احتياج الماء"),
+                value = "${String.format(Locale.US, "%.1f", health.dailyWaterLiters)}L (${health.dailyWaterCups} ${tr(lang, "cups", "كوب")})",
+                color = IonCyan
+            )
+            MiniStatPill(
+                label = tr(lang, "Crop ET₀", "تبخر التربة"),
+                value = "${String.format(Locale.US, "%.1f", agri.evapotranspirationMmDay)} mm",
+                color = OasisEmerald
+            )
+        }
+
+        // Next Prayer Weather Strip
+        if (bundle.prayerSchedule.isNotEmpty()) {
+            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                items(bundle.prayerSchedule) { p ->
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = StormViolet.copy(alpha = 0.14f)
+                    ) {
+                        Text(
+                            text = "${if (lang == AppLanguage.ARABIC) p.nameAr else p.nameEn} ${p.timeHHMM} (${UnitFormatter.formatTemp(p.tempC, prefs.tempUnit)})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+            }
         }
     }
 }

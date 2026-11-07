@@ -22,7 +22,7 @@ private val Context.dataStore by preferencesDataStore(name = "atmosphere_user_pr
 class PreferencesManager(private val context: Context) {
 
     companion object {
-        private val KEY_LANGUAGE = stringPreferencesKey("language")
+        private val KEY_LANGUAGE = stringPreferencesKey("language_v2")
         private val KEY_THEME = stringPreferencesKey("theme_mode")
         private val KEY_TEMP_UNIT = stringPreferencesKey("temp_unit")
         private val KEY_WIND_UNIT = stringPreferencesKey("wind_unit")
@@ -39,7 +39,7 @@ class PreferencesManager(private val context: Context) {
     val preferencesFlow: Flow<UserPreferences> = context.dataStore.data.map { prefs ->
         UserPreferences(
             language = prefs[KEY_LANGUAGE]?.let { runCatching { AppLanguage.valueOf(it) }.getOrNull() }
-                ?: AppLanguage.ENGLISH,
+                ?: AppLanguage.ARABIC,
             themeMode = prefs[KEY_THEME]?.let { runCatching { AppThemeMode.valueOf(it) }.getOrNull() }
                 ?: AppThemeMode.DARK,
             tempUnit = prefs[KEY_TEMP_UNIT]?.let { runCatching { TempUnit.valueOf(it) }.getOrNull() }

@@ -1,5 +1,6 @@
 package com.example.util
 
+import com.example.data.model.AgricultureInsight
 import com.example.data.model.AirQualityData
 import com.example.data.model.AlertCategory
 import com.example.data.model.AlertSeverity
@@ -9,7 +10,11 @@ import com.example.data.model.ComfortScoreBreakdown
 import com.example.data.model.CurrentWeather
 import com.example.data.model.DailyForecastItem
 import com.example.data.model.GoldenHourInfo
+import com.example.data.model.HealthBiometeorologyInsight
+import com.example.data.model.HighwayCorridorStatus
 import com.example.data.model.HourlyForecastItem
+import com.example.data.model.PrayerWeatherSlot
+import com.example.data.model.SolarEnergyInsight
 import com.example.data.model.WeatherAlert
 import com.example.data.model.WeatherConditionType
 import java.util.Locale
@@ -578,6 +583,334 @@ object MeteorologyCalculator {
         }
 
         return alerts
+    }
+
+    /**
+     * 1. Solar Rooftop & Home Inverter Optimizer (Crucial for Iraqi homes & solar arrays)
+     */
+    fun calculateSolarEnergyInsight(
+        current: CurrentWeather,
+        airQuality: AirQualityData,
+        daily: List<DailyForecastItem>
+    ): SolarEnergyInsight {
+        val cloudLoss = (current.cloudCoverPercent * 0.55).roundToInt()
+        val dustSoilingLoss = ((airQuality.dustUgM3 / 18.0) + (airQuality.pm10UgM3 / 32.0))
+            .roundToInt().coerceIn(2, 38)
+        // PV cell temperature exceeds ambient by ~18°C under full sun; -0.4% per °C above 25°C
+        val cellTempC = current.temperatureC + if (current.isDay) 16.0 else 0.0
+        val heatDerating = if (cellTempC > 25.0) {
+            ((cellTempC - 25.0) * 0.42).roundToInt().coerceIn(0, 22)
+        } else {
+            0
+        }
+
+        val netEfficiency = (100 - (cloudLoss * 0.4).roundToInt() - dustSoilingLoss - heatDerating)
+            .coerceIn(28, 97)
+        val peakSunHours = (current.daylightDurationHours * (1.0 - current.cloudCoverPercent / 150.0) * 0.62)
+            .coerceIn(2.2, 8.4)
+        val est5KwOutput = (5.0 * peakSunHours * (netEfficiency / 100.0)).coerceIn(4.5, 34.0)
+
+        val upcomingDustOrRain = daily.take(2).any { it.precipProbMaxPercent >= 35 } || airQuality.dustUgM3 >= 110.0
+        val (cleanEn, cleanAr) = if (upcomingDustOrRain) {
+            "Wait 48 hours before washing panels — active dust or rain showers expected soon." to
+                "تريّث 48 ساعة قبل غسل الألواح الشمسية — يُتوقع نشاط للغبار أو زخات مطر قريباً."
+        } else if (dustSoilingLoss >= 12) {
+            "Recommended: Wash solar panels early tomorrow morning (before 06:30) to recover +$dustSoilingLoss% output." to
+                "موصى به: اغسل الألواح الشمسية في الصباح الباكر (قبل 6:30 ص) لاستعادة +$dustSoilingLoss% من الكفاءة."
+        } else {
+            "Panels are operating cleanly with minimal dust attenuation ($dustSoilingLoss% loss)." to
+                "الألواح تعمل بكفاءة عالية مع فاقد غبار طفيف ($dustSoilingLoss% فقط)."
+        }
+
+        val (invEn, invAr) = if (current.temperatureC >= 40.0) {
+            "Ensure inverter room ventilation is active; high ambient heat reduces charging efficiency." to
+                "تأكد من تهوية غرفة الإنفرتر والبطاريات جيداً لتفادي الإجهاد الحراري وقت الظهيرة."
+        } else {
+            "Optimal charging window between 09:00 and 15:00 local solar time." to
+                "أفضل ذروة لشحن منظومة الطاقة الشمسية والبطاريات بين 9:00 صباحاً و3:00 عصراً."
+        }
+
+        return SolarEnergyInsight(
+            panelEfficiencyPercent = netEfficiency,
+            peakSunHours = peakSunHours,
+            dustSoilingLossPercent = dustSoilingLoss,
+            heatDeratingPercent = heatDerating,
+            estimatedKwhPer5KwSystem = est5KwOutput,
+            cleaningAdviceEn = cleanEn,
+            cleaningAdviceAr = cleanAr,
+            inverterNoteEn = invEn,
+            inverterNoteAr = invAr
+        )
+    }
+
+    /**
+     * 2. Smart Agriculture, Date Palm & Irrigation Evapotranspiration Advisor
+     */
+    fun calculateAgricultureInsight(
+        current: CurrentWeather,
+        airQuality: AirQualityData
+    ): AgricultureInsight {
+        // Hargreaves/Penman simplified daily reference Evapotranspiration (ET0 in mm/day)
+        val tempRange = (current.maxTempC - current.minTempC).coerceAtLeast(6.0)
+        val windFactor = 1.0 + (current.windSpeedKmh / 65.0)
+        val et0 = (0.0023 * (current.temperatureC + 17.8) * kotlin.math.sqrt(tempRange) * 3.6 * windFactor)
+            .coerceIn(1.5, 14.5)
+
+        val soilStress = ((et0 / 12.0 * 65.0) + ((100 - current.humidityPercent) * 0.35))
+            .roundToInt().coerceIn(15, 98)
+
+        val (irrigEn, irrigAr) = when {
+            et0 >= 7.5 -> "High Evapotranspiration (${String.format(Locale.US, "%.1f", et0)} mm/day) — Irrigate at dawn or after sunset to prevent 40% evaporation loss." to
+                "تبخر ونتح مرتفع (${String.format(Locale.US, "%.1f", et0)} ملم/يوم) — يُنصح بالسقي فجراً أو بعد الغروب لتقليل فاقد التبخر بنسبة 40%."
+            et0 >= 4.5 -> "Moderate water demand (${String.format(Locale.US, "%.1f", et0)} mm/day) — Standard drip/basin irrigation schedule." to
+                "احتياج مائي معتدل (${String.format(Locale.US, "%.1f", et0)} ملم/يوم) — جدول الري بالتنقيط أو الأحواض المعتاد."
+            else -> "Low evaporation rate (${String.format(Locale.US, "%.1f", et0)} mm/day) — Conserve irrigation water; check soil moisture." to
+                "معدل تبخر منخفض (${String.format(Locale.US, "%.1f", et0)} ملم/يوم) — قلل كميات السقي لتجنب تشبع التربة."
+        }
+
+        val (palmEn, palmAr) = if (airQuality.dustUgM3 >= 95.0) {
+            "Date Palms & Orchards: Dust accumulation on fronds increases mite risk; foliar water wash recommended." to
+                "بساتين النخيل والحمضيات: تراكم الغبار على السعف يزيد خطر عنكبوت الغبار (الحمير)؛ يُنصح بالغسل المائي."
+        } else {
+            "Date Palms & Crops: Favorable thermal & humidity balance for vegetative growth." to
+                "بساتين النخيل والمحاصيل: توازن حراري ورطوبي ملائم لنمو الأشجار والمحاصيل الحقلية."
+        }
+
+        val (sprayEn, sprayAr) = if (current.windSpeedKmh <= 15.0 && current.precipitationProbPercent < 25) {
+            "Suitable for foliar fertilization & pest control (Wind ${current.windSpeedKmh.roundToInt()} km/h < 15 km/h)." to
+                "الوقت مناسب للرش الورقي والمكافحة الزراعية (سرعة الرياح ${current.windSpeedKmh.roundToInt()} كم/س ضمن الحد الآمن)."
+        } else {
+            "Avoid agricultural spraying right now — wind drift (${current.windSpeedKmh.roundToInt()} km/h) or rain risk." to
+                "تجنب الرش الزراعي حالياً — سرعة الرياح (${current.windSpeedKmh.roundToInt()} كم/س) تؤدي لتطاير المبيدات والأسمدة."
+        }
+
+        return AgricultureInsight(
+            evapotranspirationMmDay = et0,
+            irrigationNeedEn = irrigEn,
+            irrigationNeedAr = irrigAr,
+            datePalmStatusEn = palmEn,
+            datePalmStatusAr = palmAr,
+            sprayingWindowEn = sprayEn,
+            sprayingWindowAr = sprayAr,
+            soilStressScore = soilStress
+        )
+    }
+
+    /**
+     * 3. Biometeorological Health, Hydration & Barometric Migraine Radar
+     */
+    fun calculateHealthBiometeorology(
+        current: CurrentWeather,
+        hourly: List<HourlyForecastItem>,
+        airQuality: AirQualityData
+    ): HealthBiometeorologyInsight {
+        // Daily hydration requirement based on temperature, heat index, and dry air
+        val baseLiters = 2.2
+        val heatExtra = ((current.maxTempC - 24.0).coerceAtLeast(0.0)) * 0.085
+        val dryExtra = if (current.humidityPercent < 25) 0.35 else 0.0
+        val waterLiters = (baseLiters + heatExtra + dryExtra).coerceIn(2.0, 5.2)
+        val cups = (waterLiters / 0.25).roundToInt()
+
+        val respLevel = when {
+            airQuality.usAqi >= 150 || airQuality.pm10UgM3 >= 180 -> 4
+            airQuality.usAqi >= 100 || airQuality.pm10UgM3 >= 100 -> 3
+            airQuality.usAqi >= 55 -> 2
+            else -> 1
+        }
+        val (respEn, respAr) = when (respLevel) {
+            4 -> "High Respiratory Alert — Keep asthma inhalers nearby & wear N95 mask outdoors." to
+                "خطر تنفسي مرتفع — يُنصح مرضى الربو والحساسية بالبقاء بالداخل أو ارتداء كمامة N95."
+            3 -> "Moderate Dust Sensitivity — Limit vigorous outdoor running during afternoon winds." to
+                "حساسية متوسطة للغبار — قلل المجهود الرياضي الخارجي عند نشاط الرياح."
+            2 -> "Mild Air Sensitivity — Safe for general public; monitor midday PM10." to
+                "تنبيه خفيف — الهواء مناسب للعموم مع متابعة الدقائق الترابية ظهراً."
+            else -> "Low Respiratory Risk — Clean air favorable for deep breathing & outdoor exercise." to
+                "مخاطر تنفسية منخفضة — هواء نقي ومناسب تماماً للرياضة والتنزه."
+        }
+
+        // Barometric pressure swing over next 12 hours
+        val pNow = current.pressureHpa
+        val p12 = hourly.take(12).map { it.pressureHpa }
+        val maxSwing = p12.maxOfOrNull { abs(it - pNow) } ?: 1.5
+        val migLevel = when {
+            maxSwing >= 6.0 -> 4
+            maxSwing >= 3.5 -> 3
+            maxSwing >= 2.0 -> 2
+            else -> 1
+        }
+        val (migEn, migAr) = when (migLevel) {
+            4, 3 -> "Barometric Swing (${String.format(Locale.US, "%.1f", maxSwing)} hPa) — Elevated migraine & sinus headache trigger." to
+                "تذبذب الضغط الجوي (${String.format(Locale.US, "%.1f", maxSwing)} hPa) — قد يحفز الصداع النصفي والشقيقة."
+            else -> "Stable Barometric Pressure (${current.pressureHpa.roundToInt()} hPa) — Low weather-related headache risk." to
+                "ضغط جوي مستقر (${current.pressureHpa.roundToInt()} hPa) — احتمالية منخفضة لصداع تقلبات الطقس."
+        }
+
+        val (heatEn, heatAr) = if (current.heatIndexC >= 39.0) {
+            "High Thermal Load (Heat Index ${current.heatIndexC.roundToInt()}°C) — Drink 1 cup of water every 30–40 min." to
+                "إجهاد حراري مرتفع (المحسوسة ${current.heatIndexC.roundToInt()}°م) — اشرب كوب ماء كل 30–40 دقيقة."
+        } else {
+            "Comfortable Thermal Balance — Maintain steady hydration ($cups cups / ${String.format(Locale.US, "%.1f", waterLiters)} L today)." to
+                "توازن حراري مريح — حافظ على شرب $cups أكواب (${String.format(Locale.US, "%.1f", waterLiters)} لتر) من الماء اليوم."
+        }
+
+        val (sinusEn, sinusAr) = if (current.humidityPercent < 25) {
+            "Dry air (${current.humidityPercent}% RH) may cause dry eyes & nasal passages; saline spray or indoor humidifier helps." to
+                "جفاف الهواء (${current.humidityPercent}%) قد يسبب جفاف الجيوب الأنفية والعيون؛ يُنصح بترطيب الجو الداخلي."
+        } else {
+            "Balanced humidity (${current.humidityPercent}%) for joint & sinus comfort." to
+                "رطوبة متوازنة (${current.humidityPercent}%) مريحة للمفاصل والجيوب الأنفية."
+        }
+
+        return HealthBiometeorologyInsight(
+            dailyWaterLiters = waterLiters,
+            dailyWaterCups = cups,
+            respiratoryDustRiskEn = respEn,
+            respiratoryDustRiskAr = respAr,
+            respiratoryRiskLevel = respLevel,
+            migrainePressureRiskEn = migEn,
+            migrainePressureRiskAr = migAr,
+            migraineRiskLevel = migLevel,
+            heatStrokeRiskEn = heatEn,
+            heatStrokeRiskAr = heatAr,
+            sinusAndJointNoteEn = sinusEn,
+            sinusAndJointNoteAr = sinusAr
+        )
+    }
+
+    /**
+     * 4. Astronomical Prayer Times & Weather-Per-Prayer Schedule
+     */
+    fun calculatePrayerWeatherSchedule(
+        current: CurrentWeather,
+        hourly: List<HourlyForecastItem>
+    ): List<PrayerWeatherSlot> {
+        val srTime = extractHourMinute(current.sunriseIso, "06:18")
+        val ssTime = extractHourMinute(current.sunsetIso, "17:08")
+        val srMin = parseHourMinToMinutes(srTime)
+        val ssMin = parseHourMinToMinutes(ssTime)
+        val dhuhrMin = (srMin + ssMin) / 2 + 2
+        val daySpan = (ssMin - srMin).coerceAtLeast(480)
+        val fajrMin = srMin - 78
+        val asrMin = dhuhrMin + (daySpan * 0.32).roundToInt()
+        val maghribMin = ssMin + 4
+        val ishaMin = ssMin + 82
+
+        val slots = listOf(
+            Triple("Fajr", "الفجر", fajrMin),
+            Triple("Sunrise", "الشروق", srMin),
+            Triple("Dhuhr", "الظهر", dhuhrMin),
+            Triple("Asr", "العصر", asrMin),
+            Triple("Maghrib", "المغرب", maghribMin),
+            Triple("Isha", "العشاء", ishaMin)
+        )
+
+        return slots.map { (nameEn, nameAr, minutes) ->
+            val targetHour = ((minutes / 60) % 24).coerceIn(0, 23)
+            val hhStr = String.format(Locale.US, "%02d:", targetHour)
+            val matchedHour = hourly.take(24).firstOrNull { it.hourLabel.startsWith(hhStr) }
+            val temp = matchedHour?.temperatureC ?: current.temperatureC
+            val wind = matchedHour?.windSpeedKmh ?: current.windSpeedKmh
+            val rainProb = matchedHour?.precipProbPercent ?: current.precipitationProbPercent
+
+            val (statusEn, statusAr) = when {
+                rainProb >= 35 -> "Rain chance $rainProb%" to "احتمال مطر $rainProb%"
+                temp >= 40.0 -> "Hot (${temp.roundToInt()}°C)" to "حار (${temp.roundToInt()}°م)"
+                temp <= 14.0 -> "Cool breeze" to "نسيم بارد"
+                else -> "Pleasant & Clear" to "أجواء صافية ومعتدلة"
+            }
+
+            PrayerWeatherSlot(
+                nameEn = nameEn,
+                nameAr = nameAr,
+                timeHHMM = formatMinutesToHHMM(minutes),
+                tempC = temp,
+                windKmh = wind,
+                statusEn = statusEn,
+                statusAr = statusAr
+            )
+        }
+    }
+
+    /**
+     * 5. Iraq Inter-Governorate Highway & Travel Corridor Safety Monitor
+     */
+    fun calculateIraqHighwayCorridors(
+        current: CurrentWeather,
+        airQuality: AirQualityData
+    ): List<HighwayCorridorStatus> {
+        val baseVisKm = (current.visibilityMeters / 1000.0).coerceIn(0.5, 15.0)
+        val baseWind = current.windSpeedKmh
+        val baseDust = airQuality.dustUgM3
+
+        data class CorridorSeed(
+            val id: String,
+            val nameEn: String,
+            val nameAr: String,
+            val visFactor: Double,
+            val windFactor: Double,
+            val dustFactor: Double
+        )
+
+        val seeds = listOf(
+            CorridorSeed(
+                id = "hwy_baghdad_basra",
+                nameEn = "Highway 1: Baghdad – Nasiriyah – Basra",
+                nameAr = "الطريق الدولي السريع: بغداد – الناصرية – البصرة",
+                visFactor = 0.92,
+                windFactor = 1.12,
+                dustFactor = 1.18
+            ),
+            CorridorSeed(
+                id = "hwy_baghdad_karbala_najaf",
+                nameEn = "Pilgrimage Route: Baghdad – Karbala – Najaf",
+                nameAr = "طريق الزائرين: بغداد – كربلاء – النجف الأشرف",
+                visFactor = 0.95,
+                windFactor = 1.05,
+                dustFactor = 1.10
+            ),
+            CorridorSeed(
+                id = "hwy_baghdad_mosul_erbil",
+                nameEn = "Northern Corridor: Baghdad – Tikrit – Mosul / Erbil",
+                nameAr = "الطريق الشمالي: بغداد – تكريت – الموصل وأربيل",
+                visFactor = 1.04,
+                windFactor = 0.95,
+                dustFactor = 0.85
+            ),
+            CorridorSeed(
+                id = "hwy_ramadi_western",
+                nameEn = "Western Desert Highway: Baghdad – Ramadi – Rutba",
+                nameAr = "طريق الأنبار الدولي: بغداد – الرمادي – الرطبة",
+                visFactor = 0.86,
+                windFactor = 1.22,
+                dustFactor = 1.32
+            )
+        )
+
+        return seeds.map { s ->
+            val vis = (baseVisKm * s.visFactor).coerceIn(0.8, 12.0)
+            val wnd = (baseWind * s.windFactor).coerceIn(5.0, 85.0)
+            val dst = (baseDust * s.dustFactor).coerceIn(10.0, 500.0)
+            val score = (100 - ((10.0 - vis).coerceAtLeast(0.0) * 5.5) - (dst * 0.09) - ((wnd - 20.0).coerceAtLeast(0.0) * 0.6))
+                .roundToInt().coerceIn(22, 98)
+
+            val (stEn, stAr) = when {
+                score >= 80 -> "Clear Highway — Optimal Driving Visibility" to "الطريق سالك بوضوح — رؤية ممتازة للقيادة"
+                score >= 58 -> "Moderate Crosswinds / Light Dust — Drive with Care" to "رياح جانبية خفيفة أو غبار عالق — قدْ بحذر"
+                else -> "Reduced Visibility & Blowing Dust — Reduce Speed" to "تدني مدى الرؤية بسبب الغبار — خفف السرعة وشغّل الأنوار"
+            }
+
+            HighwayCorridorStatus(
+                id = s.id,
+                nameEn = s.nameEn,
+                nameAr = s.nameAr,
+                visibilityKm = vis,
+                windKmh = wnd,
+                dustUgM3 = dst,
+                safetyScore = score,
+                statusEn = stEn,
+                statusAr = stAr
+            )
+        }
     }
 
     fun extractHourMinute(iso: String, fallback: String): String {

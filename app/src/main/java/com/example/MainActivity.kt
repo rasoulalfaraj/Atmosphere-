@@ -8,6 +8,8 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Analytics
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -32,6 +35,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.Radar
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SolarPower
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
@@ -52,6 +56,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
@@ -73,8 +78,10 @@ import com.example.ui.screens.DashboardScreen
 import com.example.ui.screens.ForecastScreen
 import com.example.ui.screens.RadarScreen
 import com.example.ui.screens.SettingsScreen
+import com.example.ui.screens.SmartAdvisorsScreen
 import com.example.ui.theme.AtmosphereAITheme
 import com.example.ui.theme.IonCyan
+import com.example.ui.theme.SolarAmber
 import com.example.util.AppStrings.tr
 import com.example.util.configureAppCheck
 
@@ -87,8 +94,9 @@ enum class AtmosphereDestination(
     DASHBOARD("dashboard", Icons.Default.Dashboard, "Home", "الرئيسية"),
     FORECASTS("forecasts", Icons.Default.CalendarMonth, "Forecasts", "التوقعات"),
     RADAR("radar", Icons.Default.Radar, "Radar", "الرادار"),
-    AIR_ANALYTICS("air_analytics", Icons.Default.Analytics, "AQI & Charts", "البيئة"),
+    SMART_ADVISORS("smart_advisors", Icons.Default.SolarPower, "Smart Hub", "المستشار"),
     AI_ASSISTANT("ai_assistant", Icons.Default.AutoAwesome, "AI Weather", "الذكاء"),
+    AIR_ANALYTICS("air_analytics", Icons.Default.Analytics, "AQI & Charts", "البيئة"),
     CITIES_ALERTS("cities_alerts", Icons.Default.LocationCity, "Cities/Alerts", "المدن"),
     SETTINGS("settings", Icons.Default.Settings, "Settings", "الإعدادات")
 }
@@ -148,15 +156,8 @@ fun AtmosphereAppRoot(viewModel: AtmosphereViewModel) {
 
     val locationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
-    ) { permissions ->
-        val granted = permissions[Manifest.permission.ACCESS_FINE_LOCATION] == true ||
-            permissions[Manifest.permission.ACCESS_COARSE_LOCATION] == true
-        if (granted) {
-            viewModel.detectGpsLocation()
-        } else {
-            // Remains fully usable when location permission is denied
-            viewModel.detectGpsLocation()
-        }
+    ) { _ ->
+        viewModel.detectGpsLocation()
     }
 
     val activeBundle = when (val state = weatherState) {
@@ -173,12 +174,12 @@ fun AtmosphereAppRoot(viewModel: AtmosphereViewModel) {
     }
     val animateBg = !prefs.reducedMotion && !prefs.batterySaverMode
 
-    // Primary 5 bottom bar tabs + Top Bar quick access for Cities/Alerts & Settings
+    // Primary 5 bottom bar tabs including the new Smart Advisors Hub
     val bottomDestinations = listOf(
         AtmosphereDestination.DASHBOARD,
         AtmosphereDestination.FORECASTS,
         AtmosphereDestination.RADAR,
-        AtmosphereDestination.AIR_ANALYTICS,
+        AtmosphereDestination.SMART_ADVISORS,
         AtmosphereDestination.AI_ASSISTANT
     )
 
@@ -199,11 +200,11 @@ fun AtmosphereAppRoot(viewModel: AtmosphereViewModel) {
                     AtmosphereTopBar(
                         lang = prefs.language,
                         currentDestination = currentDestination,
-                        alertCount = activeBundle?.alerts?.size ?: 0,
                         onToggleLanguage = {
-                            val next = if (prefs.language == AppLanguage.ENGLISH) AppLanguage.ARABIC else AppLanguage.ENGLISH
+                            val next = if (prefs.language == AppLanguage.ARABIC) AppLanguage.ENGLISH else AppLanguage.ARABIC
                             viewModel.setLanguage(next)
                         },
+                        onOpenAirAnalytics = { currentDestination = AtmosphereDestination.AIR_ANALYTICS },
                         onOpenCitiesAlerts = { currentDestination = AtmosphereDestination.CITIES_ALERTS },
                         onOpenSettings = { currentDestination = AtmosphereDestination.SETTINGS }
                     )
@@ -332,7 +333,8 @@ fun AtmosphereAppRoot(viewModel: AtmosphereViewModel) {
                                         onOpenForecasts = { currentDestination = AtmosphereDestination.FORECASTS },
                                         onOpenAlertsAndCities = { currentDestination = AtmosphereDestination.CITIES_ALERTS },
                                         onOpenAiAssistant = { currentDestination = AtmosphereDestination.AI_ASSISTANT },
-                                        onOpenAirQuality = { currentDestination = AtmosphereDestination.AIR_ANALYTICS }
+                                        onOpenAirQuality = { currentDestination = AtmosphereDestination.AIR_ANALYTICS },
+                                        onOpenSmartAdvisors = { currentDestination = AtmosphereDestination.SMART_ADVISORS }
                                     )
 
                                     AtmosphereDestination.FORECASTS -> ForecastScreen(
@@ -353,6 +355,11 @@ fun AtmosphereAppRoot(viewModel: AtmosphereViewModel) {
                                         onSelectCityFromMap = { city ->
                                             viewModel.loadWeatherForCity(city)
                                         }
+                                    )
+
+                                    AtmosphereDestination.SMART_ADVISORS -> SmartAdvisorsScreen(
+                                        bundle = activeBundle,
+                                        prefs = prefs
                                     )
 
                                     AtmosphereDestination.AIR_ANALYTICS -> AirQualityAndAnalyticsScreen(
@@ -424,21 +431,21 @@ fun AtmosphereAppRoot(viewModel: AtmosphereViewModel) {
 private fun AtmosphereTopBar(
     lang: AppLanguage,
     currentDestination: AtmosphereDestination,
-    alertCount: Int,
     onToggleLanguage: () -> Unit,
+    onOpenAirAnalytics: () -> Unit,
     onOpenCitiesAlerts: () -> Unit,
     onOpenSettings: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 6.dp),
+            .padding(horizontal = 14.dp, vertical = 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             Text(
                 text = "ATMOSPHERE AI",
@@ -447,7 +454,7 @@ private fun AtmosphereTopBar(
                 fontWeight = FontWeight.Bold
             )
             Text(
-                text = if (lang == AppLanguage.ARABIC) "• العراق" else "• Environmental Intelligence",
+                text = if (lang == AppLanguage.ARABIC) "• الطقس والبيئة" else "• Weather IQ",
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -455,18 +462,48 @@ private fun AtmosphereTopBar(
 
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(2.dp)
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            // Instant Arabic / English Toggle Button
+            // Prominent Bilingual Pill Button (عربي / EN)
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = SolarAmber.copy(alpha = 0.2f),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .border(1.dp, SolarAmber, RoundedCornerShape(50))
+                    .clickable { onToggleLanguage() }
+                    .testTag("top_language_toggle")
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Language,
+                        contentDescription = null,
+                        tint = SolarAmber,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Text(
+                        text = if (lang == AppLanguage.ARABIC) "EN / عربي" else "عربي / EN",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = SolarAmber,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Air Quality & Analytics Button
             IconButton(
-                onClick = onToggleLanguage,
-                modifier = Modifier.testTag("top_language_toggle")
+                onClick = onOpenAirAnalytics,
+                modifier = Modifier.testTag("top_air_analytics_button")
             ) {
                 Icon(
-                    imageVector = Icons.Default.Language,
-                    contentDescription = tr(lang, "Switch Arabic/English", "تبديل اللغة عربي/إنجليزي"),
-                    tint = if (lang == AppLanguage.ARABIC) IonCyan else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(21.dp)
+                    imageVector = Icons.Default.Analytics,
+                    contentDescription = tr(lang, "AQI & Analytics", "جودة الهواء والرسوم"),
+                    tint = if (currentDestination == AtmosphereDestination.AIR_ANALYTICS) IonCyan else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -479,7 +516,7 @@ private fun AtmosphereTopBar(
                     imageVector = Icons.Default.LocationCity,
                     contentDescription = tr(lang, "Cities, Alerts & Comparison", "المدن والتحذيرات والمقارنة"),
                     tint = if (currentDestination == AtmosphereDestination.CITIES_ALERTS) IonCyan else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(21.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
 
@@ -492,7 +529,7 @@ private fun AtmosphereTopBar(
                     imageVector = Icons.Default.Settings,
                     contentDescription = tr(lang, "Settings", "الإعدادات"),
                     tint = if (currentDestination == AtmosphereDestination.SETTINGS) IonCyan else MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(21.dp)
+                    modifier = Modifier.size(20.dp)
                 )
             }
         }
